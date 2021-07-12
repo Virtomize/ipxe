@@ -10,6 +10,7 @@ LDFLAGS		:=
 HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
 CROSS_COMPILE	?= $(CROSS)
+SYMBOL_PREFIX	:=
 
 ###############################################################################
 #
@@ -48,7 +49,6 @@ ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
 EFIFATBIN	:= ./util/efifatbin
-ICCFIX		:= ./util/iccfix
 EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
