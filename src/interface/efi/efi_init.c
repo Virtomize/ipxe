@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 
 /** Image handle passed to entry point */
@@ -33,6 +34,9 @@ EFI_HANDLE efi_image_handle;
 
 /** Loaded image protocol for this image */
 EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
+
+/** Device path for the loaded image's device handle */
+EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 
 /** System table passed to entry point
  *
@@ -42,6 +46,9 @@ EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
  * build.
  */
 EFI_SYSTEM_TABLE * _C2 ( PLATFORM, _systab );
+
+/** External task priority level */
+EFI_TPL efi_external_tpl = TPL_APPLICATION;
 
 /** EFI shutdown is in progress */
 int efi_shutdown_in_progress;
@@ -152,6 +159,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
 	void *loaded_image;
+	void *device_path;
+	void *device_path_copy;
+	size_t device_path_len;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -230,6 +240,33 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
 
+	/* Get loaded image's device handle's device path */
+	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
+				&efi_device_path_protocol_guid,
+				&device_path, image_handle, NULL,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI could not get loaded image's device path: "
+		       "%s", strerror ( rc ) );
+		goto err_no_device_path;
+	}
+
+	/* Make a copy of the loaded image's device handle's device
+	 * path, since the device handle itself may become invalidated
+	 * when we load our own drivers.
+	 */
+	device_path_len = ( efi_path_len ( device_path ) +
+			    sizeof ( EFI_DEVICE_PATH_PROTOCOL ) );
+	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, device_path_len,
+					  &device_path_copy ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		goto err_alloc_device_path;
+	}
+	memcpy ( device_path_copy, device_path, device_path_len );
+	efi_loaded_image_path = device_path_copy;
+	DBGC ( systab, "EFI image device path %s\n",
+	       efi_devpath_text ( efi_loaded_image_path ) );
+
 	/* EFI is perfectly capable of gracefully shutting down any
 	 * loaded devices if it decides to fall back to a legacy boot.
 	 * For no particularly comprehensible reason, it doesn't
@@ -261,6 +298,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
  err_driver_install:
 	bs->CloseEvent ( efi_shutdown_event );
  err_create_event:
+	bs->FreePool ( efi_loaded_image_path );
+ err_alloc_device_path:
+ err_no_device_path:
  err_no_loaded_image:
  err_missing_table:
  err_missing_protocol:
@@ -291,6 +331,9 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	/* Uninstall exit boot services event */
 	bs->CloseEvent ( efi_shutdown_event );
 
+	/* Free copy of loaded image's device handle's device path */
+	bs->FreePool ( efi_loaded_image_path );
+
 	DBGC ( systab, "EFI image unloaded\n" );
 
 	return 0;
@@ -320,4 +363,35 @@ __attribute__ (( noreturn )) void __stack_chk_fail ( void ) {
 	/* If the exit fails for any reason, lock the system */
 	while ( 1 ) {}
 
+}
+
+/**
+ * Raise task priority level to TPL_CALLBACK
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Record current external TPL */
+	tpl->previous = efi_external_tpl;
+
+	/* Raise TPL and record previous TPL as new external TPL */
+	tpl->current = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_external_tpl = tpl->current;
+}
+
+/**
+ * Restore task priority level
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_restore_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Restore external TPL */
+	efi_external_tpl = tpl->previous;
+
+	/* Restore TPL */
+	bs->RestoreTPL ( tpl->current );
 }
