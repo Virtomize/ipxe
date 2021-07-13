@@ -83,8 +83,6 @@ static int expire_exec ( int argc, char **argv ) {
 
   now = (int)time(NULL);
 
-  printf ( "checking now - timestamp: %d - %d\n", now, timestamp );
-
   if ( now > timestamp ) {
     printf ( "date expired\n" );
     return -EACCES;
