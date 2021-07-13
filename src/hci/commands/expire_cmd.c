@@ -51,13 +51,11 @@ struct expire_options {
 
 /** "expire" option list */
 static struct option_descriptor expire_opts[] = {
-	OPTION_DESC ( "timestamp", 't', required_argument,
-		      struct expire_options, timestamp, parse_integer),
 };
 
 /** "expire" command descriptor */
 static struct command_descriptor expire_cmd =
-	COMMAND_DESC ( struct expire_options, expire_opts, 1, 1, "<timestamp>" );
+	COMMAND_DESC ( struct expire_options, expire_opts, 0, 0, "<timestamp>" );
 
 /**
  * The "expire" command
@@ -82,8 +80,10 @@ static int expire_exec ( int argc, char **argv ) {
 
   now = (int)time(NULL);
 
-  if ( now > opts.timestamp )
+  if ( now > opts.timestamp ) {
+    printf ( "date expired\n" );
     return -EACCES;
+  }
 
 	return 0;
 }
