@@ -40,9 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Default timestamp */
-#define EXPIRE_DEFAULT_TIMESTAMP 0
-
 /** "expire" options */
 struct expire_options {
 	/** timestamp */
@@ -67,22 +64,28 @@ static struct command_descriptor expire_cmd =
 static int expire_exec ( int argc, char **argv ) {
   struct expire_options opts;
   unsigned int now;
+  unsigned int timestamp;
   int rc;
+
 
   /* Initialise options */
   memset ( &opts, 0, sizeof ( opts ) );
-
-  opts.timestamp = EXPIRE_DEFAULT_TIMESTAMP;
 
   /* Parse options */
   if ( ( rc = reparse_options ( argc, argv, &expire_cmd, &opts ) ) != 0 )
     return rc;
 
+
+  /* Parse timestamp */
+  if ( ( rc = parse_integer ( argv[optind], &timestamp ) ) != 0 )
+    return rc;
+
+
   now = (int)time(NULL);
 
-  printf ( "checking now - timestamp: %d - %d\n", now, opts.timestamp );
+  printf ( "checking now - timestamp: %d - %d\n", now, timestamp );
 
-  if ( now > opts.timestamp ) {
+  if ( now < timestamp ) {
     printf ( "date expired\n" );
     return -EACCES;
   }
