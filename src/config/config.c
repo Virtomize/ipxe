@@ -272,6 +272,9 @@ REQUIRE_OBJECT ( neighbour_cmd );
 #ifdef PING_CMD
 REQUIRE_OBJECT ( ping_cmd );
 #endif
+#ifdef EXPIRE_CMD
+REQUIRE_OBJECT ( expire_cmd );
+#endif
 #ifdef CONSOLE_CMD
 REQUIRE_OBJECT ( console_cmd );
 #endif
