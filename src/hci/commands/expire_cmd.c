@@ -55,7 +55,7 @@ static struct option_descriptor expire_opts[] = {
 
 /** "expire" command descriptor */
 static struct command_descriptor expire_cmd =
-	COMMAND_DESC ( struct expire_options, expire_opts, 0, 0, "<timestamp>" );
+	COMMAND_DESC ( struct expire_options, expire_opts, 1, 1, "<timestamp>" );
 
 /**
  * The "expire" command
